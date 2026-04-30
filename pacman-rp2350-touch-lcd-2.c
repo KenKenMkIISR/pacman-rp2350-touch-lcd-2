@@ -29,6 +29,8 @@ caused by using this program.
 
 #include "pico/stdlib.h"
 #include "pico/multicore.h"
+#include "hardware/clocks.h"
+#include "hardware/vreg.h"
 #include "hardware/pwm.h"
 #include "hardware/spi.h"
 #include "LCDdriver.h"
@@ -86,13 +88,13 @@ unsigned char cookiesoundcount,fruitsoundcount,over10000soundcount;//各種効�
 unsigned short monstersound,monstersounddif; //モンスター効果音の値と増減値（モードにより異なる）
 unsigned short monsterhuntedsound; //イジケ捕獲効果音の値
 unsigned short fruitsound; //フルーツ獲得効果音
-unsigned short firekeyold; //一時停止キー状態
+unsigned short taikicount1,taikicount2; //アオスケ、グズタがモンスターハウスから出ようとするまでのカウンター
 unsigned char map[MAPXSIZE*MAPYSIZE]; // 通路、壁、えさ、パワーえさ、フルーツ、ドアがあることを表す
 unsigned char fruit[]={0,1,2,2,3,3,4,4,5,5,6,6,7}; //面ごとのフルーツ番号
 unsigned short fruitscore[]={10,30,50,70,100,200,300,500}; //フルーツの得点
-unsigned short pacmansp[]= {135,150,150,150,160,160,160,170,170,170,190,190,190,210,210,210,210,256,256,256,256}; //面ごとのパックマン速度
-unsigned short monstersp[]={135,150,150,150,160,160,160,170,170,170,190,190,190,210,210,210,210,256,256,256,256}; //面ごとのモンスター速度
-unsigned short ijikesp[]=  { 50, 60, 60, 60, 65, 65, 65, 70, 70, 70, 75, 75, 75, 80, 80, 80, 80, 90, 90, 90, 90}; //面ごとのイジケ速度
+unsigned short pacmansp[]= {200,230,230,230,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256}; //面ごとのパックマン速度
+unsigned short monstersp[]={200,230,230,230,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256}; //面ごとのモンスター速度
+unsigned short ijikesp[]=  { 80, 90, 90, 90,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100}; //面ごとのイジケ速度
 unsigned short ijike[]=    {550,520,450,350,130,300,130,120, 60,300,100, 60, 60,180, 60, 60,  0 ,60,  0,  0,  0}; //面ごとのイジケ時間
 unsigned short medamasp[]= {512,512,512,512,512,512,512,512,512,512,512,512,512,512,512,512,512,512,512,512,512}; //面ごとの目玉速度
 
@@ -117,48 +119,51 @@ unsigned char musicdata2[]={6,6,255,2,6,6,255,2,6,8,3,4,1,4,6,2,255,2,6,12,10,16
 						12,8,11,8,9,8,6,8,9,8,6,16,254};
 //
 //マップ定義
+//壁とえさの配置 0x74～0x8e:壁、0x8f:何もなし（通路）、0x90:えさ、0x91:パワーえさ
 unsigned char scenedata[MAPXSIZE*MAPYSIZE]={
-	//壁とえさの配置 0x80～0x8e:壁、0x8f:何もなし（通路）、0x90:えさ、0x91:パワーえさ
-	0x80,0x84,0x84,0x84,0x84,0x84,0x84,0x84,0x84,0x84,0x8a,0x84,0x84,0x84,0x84,0x84,0x84,0x84,0x84,0x84,0x81,
-	0x85,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x85,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x85,
-	0x85,0x90,0x80,0x84,0x81,0x90,0x80,0x84,0x81,0x90,0x85,0x90,0x80,0x84,0x81,0x90,0x80,0x84,0x81,0x90,0x85,
-	0x85,0x91,0x85,0x8f,0x85,0x90,0x85,0x8f,0x85,0x90,0x85,0x90,0x85,0x8f,0x85,0x90,0x85,0x8f,0x85,0x91,0x85,
-	0x85,0x90,0x82,0x84,0x83,0x90,0x82,0x84,0x83,0x90,0x86,0x90,0x82,0x84,0x83,0x90,0x82,0x84,0x83,0x90,0x85,
-	0x85,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x85,
-	0x85,0x90,0x80,0x84,0x81,0x90,0x87,0x90,0x80,0x84,0x84,0x84,0x81,0x90,0x87,0x90,0x80,0x84,0x81,0x90,0x85,
-	0x85,0x90,0x82,0x84,0x83,0x90,0x85,0x90,0x82,0x84,0x8a,0x84,0x83,0x90,0x85,0x90,0x82,0x84,0x83,0x90,0x85,
-	0x85,0x90,0x90,0x90,0x90,0x90,0x85,0x90,0x90,0x90,0x85,0x90,0x90,0x90,0x85,0x90,0x90,0x90,0x90,0x90,0x85,
-	0x82,0x84,0x84,0x84,0x81,0x90,0x8d,0x84,0x89,0x90,0x86,0x90,0x88,0x84,0x8c,0x90,0x80,0x84,0x84,0x84,0x83,
-	0x8f,0x8f,0x8f,0x8f,0x85,0x90,0x85,0x8f,0x8f,0x8f,0x8f,0x8f,0x8f,0x8f,0x85,0x90,0x85,0x8f,0x8f,0x8f,0x8f,
-	0x8f,0x8f,0x8f,0x8f,0x85,0x90,0x85,0x8f,0x80,0x84,0x8e,0x84,0x81,0x8f,0x85,0x90,0x85,0x8f,0x8f,0x8f,0x8f,
-	0x88,0x84,0x84,0x84,0x83,0x90,0x86,0x8f,0x85,0x8f,0x8f,0x8f,0x85,0x8f,0x86,0x90,0x82,0x84,0x84,0x84,0x89,
-	0x8f,0x8f,0x8f,0x8f,0x8f,0x90,0x8f,0x8f,0x85,0x8f,0x8f,0x8f,0x85,0x8f,0x8f,0x90,0x8f,0x8f,0x8f,0x8f,0x8f,
-	0x88,0x84,0x84,0x84,0x81,0x90,0x87,0x8f,0x82,0x84,0x84,0x84,0x83,0x8f,0x87,0x90,0x80,0x84,0x84,0x84,0x89,
-	0x8f,0x8f,0x8f,0x8f,0x85,0x90,0x85,0x8f,0x8f,0x8f,0x8f,0x8f,0x8f,0x8f,0x85,0x90,0x85,0x8f,0x8f,0x8f,0x8f,
-	0x8f,0x8f,0x8f,0x8f,0x85,0x90,0x85,0x8f,0x80,0x84,0x84,0x84,0x81,0x8f,0x85,0x90,0x85,0x8f,0x8f,0x8f,0x8f,
-	0x80,0x84,0x84,0x84,0x83,0x90,0x86,0x8f,0x82,0x84,0x8a,0x84,0x83,0x8f,0x86,0x90,0x82,0x84,0x84,0x84,0x81,
-	0x85,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x85,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x85,
-	0x85,0x90,0x88,0x84,0x81,0x90,0x88,0x84,0x89,0x90,0x86,0x90,0x88,0x84,0x89,0x90,0x80,0x84,0x89,0x90,0x85,
-	0x85,0x91,0x90,0x90,0x85,0x90,0x90,0x90,0x90,0x90,0x8f,0x90,0x90,0x90,0x90,0x90,0x85,0x90,0x90,0x91,0x85,
-	0x8d,0x84,0x81,0x90,0x85,0x90,0x87,0x90,0x80,0x84,0x84,0x84,0x81,0x90,0x87,0x90,0x85,0x90,0x80,0x84,0x8c,
-	0x8d,0x84,0x83,0x90,0x86,0x90,0x85,0x90,0x82,0x84,0x8a,0x84,0x83,0x90,0x85,0x90,0x86,0x90,0x82,0x84,0x8c,
-	0x85,0x90,0x90,0x90,0x90,0x90,0x85,0x90,0x90,0x90,0x85,0x90,0x90,0x90,0x85,0x90,0x90,0x90,0x90,0x90,0x85,
-	0x85,0x90,0x88,0x84,0x84,0x84,0x8b,0x84,0x89,0x90,0x86,0x90,0x88,0x84,0x8b,0x84,0x84,0x84,0x89,0x90,0x85,
-	0x85,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x85,
-	0x82,0x84,0x84,0x84,0x84,0x84,0x84,0x84,0x84,0x84,0x84,0x84,0x84,0x84,0x84,0x84,0x84,0x84,0x84,0x84,0x83
+	0x80,0x86,0x86,0x86,0x86,0x86,0x86,0x86,0x86,0x86,0x86,0x86,0x86,0x8a,0x8b,0x86,0x86,0x86,0x86,0x86,0x86,0x86,0x86,0x86,0x86,0x86,0x86,0x81,
+	0x85,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x7f,0x7d,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x87,
+	0x85,0x90,0x78,0x7c,0x7c,0x79,0x90,0x78,0x7c,0x7c,0x7c,0x79,0x90,0x7f,0x7d,0x90,0x78,0x7c,0x7c,0x7c,0x79,0x90,0x78,0x7c,0x7c,0x79,0x90,0x87,
+	0x85,0x91,0x7f,0x8f,0x8f,0x7d,0x90,0x7f,0x8f,0x8f,0x8f,0x7d,0x90,0x7f,0x7d,0x90,0x7f,0x8f,0x8f,0x8f,0x7d,0x90,0x7f,0x8f,0x8f,0x7d,0x91,0x87,
+	0x85,0x90,0x7a,0x7e,0x7e,0x7b,0x90,0x7a,0x7e,0x7e,0x7e,0x7b,0x90,0x7a,0x7b,0x90,0x7a,0x7e,0x7e,0x7e,0x7b,0x90,0x7a,0x7e,0x7e,0x7b,0x90,0x87,
+	0x85,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x87,
+	0x85,0x90,0x78,0x7c,0x7c,0x79,0x90,0x78,0x79,0x90,0x78,0x7c,0x7c,0x7c,0x7c,0x7c,0x7c,0x79,0x90,0x78,0x79,0x90,0x78,0x7c,0x7c,0x79,0x90,0x87,
+	0x85,0x90,0x7a,0x7e,0x7e,0x7b,0x90,0x7f,0x7d,0x90,0x7a,0x7e,0x7e,0x75,0x74,0x7e,0x7e,0x7b,0x90,0x7f,0x7d,0x90,0x7a,0x7e,0x7e,0x7b,0x90,0x87,
+	0x85,0x90,0x90,0x90,0x90,0x90,0x90,0x7f,0x7d,0x90,0x90,0x90,0x90,0x7f,0x7d,0x90,0x90,0x90,0x90,0x7f,0x7d,0x90,0x90,0x90,0x90,0x90,0x90,0x87,
+	0x82,0x84,0x84,0x84,0x84,0x79,0x90,0x7f,0x76,0x7c,0x7c,0x79,0x8f,0x7f,0x7d,0x8f,0x78,0x7c,0x7c,0x77,0x7d,0x90,0x78,0x84,0x84,0x84,0x84,0x83,
+	0x8f,0x8f,0x8f,0x8f,0x8f,0x85,0x90,0x7f,0x74,0x7e,0x7e,0x7b,0x8f,0x7a,0x7b,0x8f,0x7a,0x7e,0x7e,0x75,0x7d,0x90,0x87,0x8f,0x8f,0x8f,0x8f,0x8f,
+	0x8f,0x8f,0x8f,0x8f,0x8f,0x85,0x90,0x7f,0x7d,0x8f,0x8f,0x8f,0x8f,0x8f,0x8f,0x8f,0x8f,0x8f,0x8f,0x7f,0x7d,0x90,0x87,0x8f,0x8f,0x8f,0x8f,0x8f,
+	0x8f,0x8f,0x8f,0x8f,0x8f,0x85,0x90,0x7f,0x7d,0x8f,0x78,0x84,0x84,0x8e,0x8e,0x84,0x84,0x79,0x8f,0x7f,0x7d,0x90,0x87,0x8f,0x8f,0x8f,0x8f,0x8f,
+	0x86,0x86,0x86,0x86,0x86,0x7b,0x90,0x7a,0x7b,0x8f,0x87,0x8f,0x8f,0x8f,0x8f,0x8f,0x8f,0x85,0x8f,0x7a,0x7b,0x90,0x7a,0x86,0x86,0x86,0x86,0x86,
+	0x8f,0x8f,0x8f,0x8f,0x8f,0x8f,0x90,0x8f,0x8f,0x8f,0x87,0x8f,0x8f,0x8f,0x8f,0x8f,0x8f,0x85,0x8f,0x8f,0x8f,0x90,0x8f,0x8f,0x8f,0x8f,0x8f,0x8f,
+	0x84,0x84,0x84,0x84,0x84,0x79,0x90,0x78,0x79,0x8f,0x87,0x8f,0x8f,0x8f,0x8f,0x8f,0x8f,0x85,0x8f,0x78,0x79,0x90,0x78,0x84,0x84,0x84,0x84,0x84,
+	0x8f,0x8f,0x8f,0x8f,0x8f,0x85,0x90,0x7f,0x7d,0x8f,0x7a,0x86,0x86,0x86,0x86,0x86,0x86,0x7b,0x8f,0x7f,0x7d,0x90,0x87,0x8f,0x8f,0x8f,0x8f,0x8f,
+	0x8f,0x8f,0x8f,0x8f,0x8f,0x85,0x90,0x7f,0x7d,0x8f,0x8f,0x8f,0x8f,0x8f,0x8f,0x8f,0x8f,0x8f,0x8f,0x7f,0x7d,0x90,0x87,0x8f,0x8f,0x8f,0x8f,0x8f,
+	0x8f,0x8f,0x8f,0x8f,0x8f,0x85,0x90,0x7f,0x7d,0x8f,0x78,0x7c,0x7c,0x7c,0x7c,0x7c,0x7c,0x79,0x8f,0x7f,0x7d,0x90,0x87,0x8f,0x8f,0x8f,0x8f,0x8f,
+	0x80,0x86,0x86,0x86,0x86,0x7b,0x90,0x7a,0x7b,0x8f,0x7a,0x7e,0x7e,0x75,0x74,0x7e,0x7e,0x7b,0x8f,0x7a,0x7b,0x90,0x7a,0x86,0x86,0x86,0x86,0x81,
+	0x85,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x7f,0x7d,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x87,
+	0x85,0x90,0x78,0x7c,0x7c,0x79,0x90,0x78,0x7c,0x7c,0x7c,0x79,0x90,0x7f,0x7d,0x90,0x78,0x7c,0x7c,0x7c,0x79,0x90,0x78,0x7c,0x7c,0x79,0x90,0x87,
+	0x85,0x90,0x7a,0x7e,0x75,0x7d,0x90,0x7a,0x7e,0x7e,0x7e,0x7b,0x90,0x7a,0x7b,0x90,0x7a,0x7e,0x7e,0x7e,0x7b,0x90,0x7f,0x74,0x7e,0x7b,0x90,0x87,
+	0x85,0x91,0x90,0x90,0x7f,0x7d,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x8f,0x8f,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x7f,0x7d,0x90,0x90,0x91,0x87,
+	0x88,0x7c,0x79,0x90,0x7f,0x7d,0x90,0x78,0x79,0x90,0x78,0x7c,0x7c,0x7c,0x7c,0x7c,0x7c,0x79,0x90,0x78,0x79,0x90,0x7f,0x7d,0x90,0x78,0x7c,0x8c,
+	0x89,0x7e,0x7b,0x90,0x7a,0x7b,0x90,0x7f,0x7d,0x90,0x7a,0x7e,0x7e,0x75,0x74,0x7e,0x7e,0x7b,0x90,0x7f,0x7d,0x90,0x7a,0x7b,0x90,0x7a,0x7e,0x8d,
+	0x85,0x90,0x90,0x90,0x90,0x90,0x90,0x7f,0x7d,0x90,0x90,0x90,0x90,0x7f,0x7d,0x90,0x90,0x90,0x90,0x7f,0x7d,0x90,0x90,0x90,0x90,0x90,0x90,0x87,
+	0x85,0x90,0x78,0x7c,0x7c,0x7c,0x7c,0x77,0x76,0x7c,0x7c,0x79,0x90,0x7f,0x7d,0x90,0x78,0x7c,0x7c,0x77,0x76,0x7c,0x7c,0x7c,0x7c,0x79,0x90,0x87,
+	0x85,0x90,0x7a,0x7e,0x7e,0x7e,0x7e,0x7e,0x7e,0x7e,0x7e,0x7b,0x90,0x7a,0x7b,0x90,0x7a,0x7e,0x7e,0x7e,0x7e,0x7e,0x7e,0x7e,0x7e,0x7b,0x90,0x87,
+	0x85,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x87,
+	0x82,0x84,0x84,0x84,0x84,0x84,0x84,0x84,0x84,0x84,0x84,0x84,0x84,0x84,0x84,0x84,0x84,0x84,0x84,0x84,0x84,0x84,0x84,0x84,0x84,0x84,0x84,0x83
 };
 
 //マクロ設定　仮想マップの読み出し、書き込み
 #define GETMAP(x,y) map[(y)*MAPXSIZE+(x)]
 #define SETMAP(x,y,d) map[(y)*MAPXSIZE+(x)]=(d)
 
-#define PWM_WRAP 4800 // 150MHz/31.25KHz
+#define PWM_WRAP 6400 // 200MHz/31.25KHz
 uint pwm_slice_num,pwm_channel_num;
 
 int imu_on=1; // 加速度センサ有効（キーボード、ボタンを検出したら無効にする）
 
 void sound_on(uint16_t f){
-	f<<=1;
 	pwm_set_clkdiv_int_frac(pwm_slice_num, f>>4, f&15);
 	pwm_set_enabled(pwm_slice_num, true);
 }
@@ -244,13 +249,12 @@ void printscore(unsigned char x,unsigned char y,unsigned char c,unsigned int s){
 
 void putbmpmn3(int x,int y,unsigned char m,unsigned char n,const unsigned char bmp[])
 // 横m*縦nドットのキャラクターを座標x,yに表示
-// ゲームのマップ内だけに描画の場合はこちら（マップ外にはみ出した部分は表示しない）
+// ゲームのマップ内の座標で指定、マップ外にはみ出した部分は表示しない
 // unsigned char bmp[m*n]配列に、単純にカラー番号を並べる
 // カラー番号が0の部分は透明色として扱う
 {
-	putbmpmn2(x,y,m,n,bmp,0,0,MAPXSIZE*8-1,MAPYSIZE*8-1);
+	putbmpmn2(x+MAPXOFS*8,y+MAPYOFS*8,m,n,bmp,MAPXOFS*8,MAPYOFS*8,(MAPXSIZE+MAPXOFS)*8-1,(MAPYSIZE+MAPYOFS)*8-1);
 }
-
 void putpacman(void){
 	//パックマンの表示
 	unsigned char a;
@@ -308,11 +312,11 @@ void putmapchar(unsigned char x,unsigned char y){
 	unsigned char d;
 
 	d=GETMAP(x,y);
-	if(d==MAP_COOKIE) printchar(x,y,COLOR_COOKIE,CODE_COOKIE);
-	else if(d==MAP_POWERCOOKIE) printchar(x,y,COLOR_POWERCOOKIE,CODE_POWERCOOKIE);
-	else if(d==MAP_DOOR) printchar(x,y,COLOR_DOOR,CODE_DOOR);
-	else if(d==MAP_WALL) printchar(x,y,COLOR_WALL,scenedata[y*MAPXSIZE+x]);
-	else printchar(x,y,0,' ');
+	if(d==MAP_COOKIE) printchar(x+MAPXOFS,y+MAPYOFS,COLOR_COOKIE,CODE_COOKIE);
+	else if(d==MAP_POWERCOOKIE) printchar(x+MAPXOFS,y+MAPYOFS,COLOR_POWERCOOKIE,CODE_POWERCOOKIE);
+	else if(d==MAP_DOOR) printchar(x+MAPXOFS,y+MAPYOFS,COLOR_DOOR,CODE_DOOR);
+	else if(d==MAP_WALL) printchar(x+MAPXOFS,y+MAPYOFS,COLOR_WALL,scenedata[y*MAPXSIZE+x]);
+	else printchar(x+MAPXOFS,y+MAPYOFS,0,' ');
 }
 void setfruit(unsigned char f){
 	// f 0:フルーツ削除&表示消去、1:フルーツ発生&表示
@@ -345,22 +349,22 @@ void getfruit(){
 
 void displayscore(){
 	if(score>highscore) highscore=score;
-	printscore(21,3,7,highscore);
-	printscore(21,7,7,score);
+	printscore(11,3,7,highscore);
+	printscore(1,3,7,score);
 }
 void displayplayers(){
 	//プレイヤー残数表示
 	unsigned char i;
-	for(i=0;i<player && i<5;i++) putbmpmn(22*8+i*16,23*8,XWIDTH_PACMAN,YWIDTH_PACMAN,Pacmanbmp[11]);
-	for(;i<4;i++) clrbmpmn(22*8+i*16,23*8,XWIDTH_PACMAN,YWIDTH_PACMAN);
+	for(i=0;i<player && i<5;i++) putbmpmn(3*8+i*16,36*8+2,XWIDTH_PACMAN,YWIDTH_PACMAN,Pacmanbmp[11]);
+	for(;i<4;i++) clrbmpmn(3*8+i*16,36*8+2,XWIDTH_PACMAN,YWIDTH_PACMAN);
 }
 void displayfruits(){
-	//画面右側に8ステージ分のフルーツを表示
+	//画面右側に7ステージ分のフルーツを表示
 	unsigned char i,no;
-	for(i=0;i<8 && i<stage;i++){
-		no=getfruitno(stage-i);
-		clrbmpmn (22*8+(i%4)*16,15*8+(i/4)*16,12,14);
-		putbmpmn(22*8+(i%4)*16,15*8+(i/4)*16,12,14,Fruitbmp[no]);
+	for(i=0;i<7 && i<stage;i++){
+		no=stage<=7 ? getfruitno(i+1) : getfruitno(i+1+stage-7);
+		clrbmpmn(13*8+(6-i)*16,36*8+2,12,14);
+		putbmpmn(13*8+(6-i)*16,36*8+2,12,14,Fruitbmp[no]);
 	}
 }
 void putmap(void){
@@ -375,20 +379,20 @@ void putmap(void){
 		for(j=0;j<MAPXSIZE;j++){
 			if(*p<=0x8d){
 				*mapp=MAP_WALL; //壁
-				printchar(j,i,COLOR_WALL,*p);
+				printchar(j+MAPXOFS,i+MAPYOFS,COLOR_WALL,*p);
 			}
 			else if(*p==CODE_DOOR){
 				*mapp=MAP_DOOR; //ドア
-				printchar(j,i,COLOR_DOOR,CODE_DOOR);
+				printchar(j+MAPXOFS,i+MAPYOFS,COLOR_DOOR,CODE_DOOR);
 			}
 			else if(*p==CODE_COOKIE){
 				*mapp=MAP_COOKIE; //えさ
-				printchar(j,i,COLOR_COOKIE,CODE_COOKIE);
+				printchar(j+MAPXOFS,i+MAPYOFS,COLOR_COOKIE,CODE_COOKIE);
 				cookie++;
 			}
 			else if(*p==CODE_POWERCOOKIE){
 				*mapp=MAP_POWERCOOKIE; //パワーえさ
-				printchar(j,i,COLOR_POWERCOOKIE,CODE_POWERCOOKIE);
+				printchar(j+MAPXOFS,i+MAPYOFS,COLOR_POWERCOOKIE,CODE_POWERCOOKIE);
 				cookie++;
 			}
 			else *mapp=0;
@@ -396,10 +400,10 @@ void putmap(void){
 			mapp++;
 		}
 	}
-	printstrc(21,1,7,"HI-SCORE");
-	printchar(27,3,7,'0');
-	printstrc(22,5,7,"1UP");
-	printchar(27,7,7,'0');
+	printstrc(10,2,7,"HIGH SCORE");
+	printchar(17,3,7,'0');
+	printstrc(4,2,7,"1UP");
+	printchar(7,3,7,'0');
 	displayscore();
 	displayplayers();
 	displayfruits();
@@ -422,6 +426,7 @@ void initcharacter(_Character *p,unsigned char s,unsigned short x,unsigned short
 	p->animcount0=ac;
 	p->animvalue=0;
 	p->modecount=modec;
+	if(y/256>=MONSTERHOUSEY*8) p->inhouse=1; else p->inhouse=0;
 }
 void gameinit(void)
 {
@@ -445,7 +450,6 @@ void gameinit2(void)
 	player=3;
 	upflag=0;//1000点越えでプレイヤー+1のチェック用
 	stage=0;
-	firekeyold=0;
 }
 void gameinit3(void)
 {
@@ -482,11 +486,21 @@ void gameinit4(void)
 	fruitsoundcount=0;
 	over10000soundcount=0;
 	setfruit(0);//フルーツ削除、表示消去
-	initcharacter(&pacman,0,10*8*256,20*8*256,DIR_LEFT,pacmanspeed,5,0);
-	initcharacter(&akabei,NAWABARI,MONSTERHOUSEX*8*256,(MONSTERHOUSEY-2)*8*256,DIR_LEFT,monsterspeed,0,550);
-	initcharacter(&pinky ,NAWABARI,MONSTERHOUSEX*8*256,(MONSTERHOUSEY+1)*8*256,DIR_UP,monsterspeed,0,0);
-	initcharacter(&aosuke,TAIKI2,(MONSTERHOUSEX-1)*8*256,(MONSTERHOUSEY+1)*8*256,DIR_DOWN,monsterspeed,0,375);
-	initcharacter(&guzuta,TAIKI2,(MONSTERHOUSEX+1)*8*256,(MONSTERHOUSEY+1)*8*256,DIR_DOWN,monsterspeed,0,600);
+	initcharacter(&pacman,0,(13*8+4)*256,23*8*256,DIR_LEFT,pacmanspeed,5,0);
+	initcharacter(&akabei,NAWABARI,(MONSTERHOUSEX*8+4)*256,(MONSTERHOUSEY-2)*8*256,DIR_LEFT,monsterspeed,0,stage<5 ? 500:360);
+	initcharacter(&pinky ,NAWABARI,(MONSTERHOUSEX*8+4)*256,(MONSTERHOUSEY+1)*8*256,DIR_UP,monsterspeed,0,0);
+	initcharacter(&aosuke,NAWABARI,((MONSTERHOUSEX-2)*8+4)*256,(MONSTERHOUSEY+1)*8*256,DIR_DOWN,monsterspeed,0,0);
+	initcharacter(&guzuta,NAWABARI,((MONSTERHOUSEX+2)*8+4)*256,(MONSTERHOUSEY+1)*8*256,DIR_DOWN,monsterspeed,0,0);
+	taikicount1=0; //アオスケが外に出ようとするまでの時間
+	taikicount2=0; //グズタが外に出ようとするまでの時間
+	if(stage==1){
+		taikicount1=300;
+		taikicount2=1000;
+	}
+	else if(stage==2){
+		taikicount1=0;
+		taikicount2=450;
+	}
 }
 
 void keycheck()
@@ -618,6 +632,33 @@ void movemonster(_Character *p,unsigned short tx,unsigned short ty){
 	p->oldy=p->y;
 	olddir=p->dir;
 
+	//ゲーム開始時のアオスケ、グズタの動き
+	if(p->no==AOSUKE && taikicount1>0 || p->no==GUZUTA && taikicount2>0){
+		if(p->dir==DIR_UP && y==MONSTERHOUSEY*8+4) p->dir=DIR_DOWN;
+		else if(p->dir==DIR_DOWN && y==(MONSTERHOUSEY+1)*8+4) p->dir=DIR_UP;
+		if(p->dir==DIR_UP) p->y-=monsterspeed/2;
+		else p->y+=monsterspeed/2;
+		return;
+	}
+	if(p->inhouse){
+		if(x<MONSTERHOUSEX*8+4){
+			p->dir=DIR_RIGHT;
+			p->x+=monsterspeed/2;
+		}
+		else if(x>MONSTERHOUSEX*8+4){
+			p->dir=DIR_LEFT;
+			p->x-=monsterspeed/2;
+		}
+		else if(y<=(MONSTERHOUSEY-2)*8){
+			p->inhouse=0;
+			p->dir=DIR_LEFT;
+		}
+		else{
+			p->dir=DIR_UP;
+			p->y-=monsterspeed/2;
+		}
+		return;
+	}
 	switch(p->dir){
 	//方向変更後、小数点以上移動するまで直進
 	//また、直進中も小数点以下移動の場合は直進する
@@ -671,7 +712,13 @@ void movemonster(_Character *p,unsigned short tx,unsigned short ty){
 	cRIGHT=1;
 	cDOWN=1;
 	cLEFT=1;
-	if((x%8)!=0){
+	if(p->status==MEDAMA && x==MONSTERHOUSEX*8+4 && y>=(MONSTERHOUSEY-2)*8 && y<=MONSTERHOUSEY*8){
+		//目玉がモンスターハウスの前に着いたとき
+		cUP=0;
+		cRIGHT=0;
+		cLEFT=0;
+	}
+	else if((x%8)!=0){
 		cUP=0;
 		cDOWN=0;
 	}
@@ -682,9 +729,9 @@ void movemonster(_Character *p,unsigned short tx,unsigned short ty){
 		  (x1==ONEWAY1X && y1==ONEWAY1Y+1 || x1==ONEWAY2X && y1==ONEWAY2Y+1 ||
 		   x1==ONEWAY3X && y1==ONEWAY3Y+1 || x1==ONEWAY4X && y1==ONEWAY4Y+1)) cUP=0;
 		if(y1!=MAPYSIZE-1){
-			//目玉のとき以外はドアも壁とみなす
+			//ドアも壁とみなす
 			t=GETMAP(x1,y1+1);
-			if(t==MAP_WALL || (t==MAP_DOOR && p->status!=MEDAMA)) cDOWN=0;
+			if(t==MAP_WALL || t==MAP_DOOR) cDOWN=0;
 		}
 	}
 
@@ -699,42 +746,71 @@ void movemonster(_Character *p,unsigned short tx,unsigned short ty){
 
 	tx>>=8;
 	ty>>=8;
-	if(p->status==TAIKI2){
-		if(y==MONSTERHOUSEY*8) p->dir=DIR_DOWN;
-		else if(y==(MONSTERHOUSEY+1)*8) p->dir=DIR_UP;
+	if(p->status==MEDAMA){
+		//目玉の時の動き
+		//モンスターハウスに近づく方向に曲がれる場合は曲がる
+		//進行方向に壁がある場合は曲がれるほうに曲がる（上向き優先）
+		switch(p->dir){
+			case DIR_UP: //進行方向=上
+				if(x<tx && cRIGHT) p->dir=DIR_RIGHT;
+				else if(x>tx && cLEFT) p->dir=DIR_LEFT;
+				else if(!cUP && cRIGHT) p->dir=DIR_RIGHT;
+				else if(!cUP && cLEFT) p->dir=DIR_LEFT;
+				break;
+			case DIR_RIGHT: //進行方向=右
+				if(y<ty && cDOWN) p->dir=DIR_DOWN;
+				else if(y>ty && cUP) p->dir=DIR_UP;
+				else if(!cRIGHT && cUP) p->dir=DIR_UP;
+				else if(!cRIGHT && cDOWN) p->dir=DIR_DOWN;
+				break;
+			case DIR_DOWN: //進行方向=下
+				if(x<tx && cRIGHT) p->dir=DIR_RIGHT;
+				else if(x>tx && cLEFT) p->dir=DIR_LEFT;
+				else if(!cDOWN && cRIGHT) p->dir=DIR_RIGHT;
+				else if(!cDOWN && cLEFT) p->dir=DIR_LEFT;
+				break;
+			case DIR_LEFT: //進行方向=左
+				if(y<ty && cDOWN) p->dir=DIR_DOWN;
+				else if(y>ty && cUP) p->dir=DIR_UP;
+				else if(!cLEFT && cUP) p->dir=DIR_UP;
+				else if(!cLEFT && cDOWN) p->dir=DIR_DOWN;
+		}
 	}
-	else switch(p->dir){
-		case DIR_UP: //進行方向=上・・・優先順位　右→上→左
-			if(x<tx && cRIGHT) p->dir=DIR_RIGHT;
-			else if(y>ty && cUP) p->dir=DIR_UP;
-			else if(x>tx && cLEFT) p->dir=DIR_LEFT;
-			else if(cRIGHT) p->dir=DIR_RIGHT;
-			else if(cUP) p->dir=DIR_UP;
-			else p->dir=DIR_LEFT;
-			break;
-		case DIR_RIGHT: //進行方向=右・・・優先順位　下→右→上
-			if(y<ty && cDOWN) p->dir=DIR_DOWN;
-			else if(x<tx && cRIGHT) p->dir=DIR_RIGHT;
-			else if(y>ty && cUP) p->dir=DIR_UP;
-			else if(cDOWN) p->dir=DIR_DOWN;
-			else if(cRIGHT) p->dir=DIR_RIGHT;
-			else p->dir=DIR_UP;
-			break;
-		case DIR_DOWN: //進行方向=下・・・優先順位　左→下→右
-			if(x>tx && cLEFT) p->dir=DIR_LEFT;
-			else if(y<ty && cDOWN) p->dir=DIR_DOWN;
-			else if(x<tx && cRIGHT) p->dir=DIR_RIGHT;
-			else if(cLEFT) p->dir=DIR_LEFT;
-			else if(cDOWN) p->dir=DIR_DOWN;
-			else p->dir=DIR_RIGHT;
-			break;
-		case DIR_LEFT: //進行方向=左・・・優先順位　上→左→下
-			if(y>ty && cUP) p->dir=DIR_UP;
-			else if(x>tx && cLEFT) p->dir=DIR_LEFT;
-			else if(y<ty && cDOWN) p->dir=DIR_DOWN;
-			else if(cUP) p->dir=DIR_UP;
-			else if(cLEFT) p->dir=DIR_LEFT;
-			else p->dir=DIR_DOWN;
+	else{
+		//目玉以外の動き
+		switch(p->dir){
+			case DIR_UP: //進行方向=上・・・優先順位　右→上→左
+				if(x<tx && cRIGHT) p->dir=DIR_RIGHT;
+				else if(y>ty && cUP) p->dir=DIR_UP;
+				else if(x>tx && cLEFT) p->dir=DIR_LEFT;
+				else if(cRIGHT) p->dir=DIR_RIGHT;
+				else if(cUP) p->dir=DIR_UP;
+				else p->dir=DIR_LEFT;
+				break;
+			case DIR_RIGHT: //進行方向=右・・・優先順位　下→右→上
+				if(y<ty && cDOWN) p->dir=DIR_DOWN;
+				else if(x<tx && cRIGHT) p->dir=DIR_RIGHT;
+				else if(y>ty && cUP) p->dir=DIR_UP;
+				else if(cDOWN) p->dir=DIR_DOWN;
+				else if(cRIGHT) p->dir=DIR_RIGHT;
+				else p->dir=DIR_UP;
+				break;
+			case DIR_DOWN: //進行方向=下・・・優先順位　左→下→右
+				if(x>tx && cLEFT) p->dir=DIR_LEFT;
+				else if(y<ty && cDOWN) p->dir=DIR_DOWN;
+				else if(x<tx && cRIGHT) p->dir=DIR_RIGHT;
+				else if(cLEFT) p->dir=DIR_LEFT;
+				else if(cDOWN) p->dir=DIR_DOWN;
+				else p->dir=DIR_RIGHT;
+				break;
+			case DIR_LEFT: //進行方向=左・・・優先順位　上→左→下
+				if(y>ty && cUP) p->dir=DIR_UP;
+				else if(x>tx && cLEFT) p->dir=DIR_LEFT;
+				else if(y<ty && cDOWN) p->dir=DIR_DOWN;
+				else if(cUP) p->dir=DIR_UP;
+				else if(cLEFT) p->dir=DIR_LEFT;
+				else p->dir=DIR_DOWN;
+		}
 	}
 	if(p->dir != olddir) p->turn=1;
 	switch(p->dir){
@@ -828,24 +904,12 @@ void moveakabei(){
 			}
 			break;
 		case MEDAMA:
-			if((akabei.x/256)==(MONSTERHOUSEX*8) && (akabei.y/256)==(MONSTERHOUSEY*8)){ //モンスターハウス到着
-				akabei.status=TAIKI2;
-				akabei.modecount=1;
-				akabei.dir=DIR_UP;
-				akabei.speed=monsterspeed;
-			}
-			break;
-		case TAIKI:
-			if((akabei.x/256)==(MONSTERHOUSEX*8) && (akabei.y/256)==((MONSTERHOUSEY-2)*8)){ //モンスターハウスから出た
+			if((akabei.x/256)==(MONSTERHOUSEX*8+4) && (akabei.y/256)==((MONSTERHOUSEY+1)*8)){ //モンスターハウス到着
+				akabei.inhouse=1;
 				akabei.status=OIKAKE;
 				akabei.modecount=TIMER_OIKAKE;
-				akabei.dir=DIR_LEFT;
-			}
-			break;
-		case TAIKI2:
-			akabei.modecount--;
-			if(akabei.modecount==0){
-				akabei.status=TAIKI;
+				akabei.dir=DIR_UP;
+				akabei.speed=monsterspeed;
 			}
 	}
 	switch (akabei.status){
@@ -859,12 +923,8 @@ void moveakabei(){
 			targety=pacman.y;
 			break;
 		case MEDAMA:
-			targetx=MONSTERHOUSEX*8*256;
-			targety=MONSTERHOUSEY*8*256;
-			break;
-		case TAIKI:
-			targetx=MONSTERHOUSEX*8*256;
-			targety=(MONSTERHOUSEY-2)*8*256;
+			targetx=(MONSTERHOUSEX*8+4)*256;
+			targety=(MONSTERHOUSEY+1)*8*256;
 	}
 	movemonster(&akabei,targetx,targety);
 }
@@ -886,24 +946,11 @@ void movepinky(){
 			}
 			break;
 		case MEDAMA:
-			if((pinky.x/256)==(MONSTERHOUSEX*8) && (pinky.y/256)==(MONSTERHOUSEY*8)){ //モンスターハウス到着
-				pinky.status=TAIKI2;
-				pinky.modecount=1;
+			if((pinky.x/256)==(MONSTERHOUSEX*8+4) && (pinky.y/256)==((MONSTERHOUSEY+1)*8)){ //モンスターハウス到着
+				pinky.inhouse=1;
+				pinky.status=OIKAKE;
 				pinky.dir=DIR_UP;
 				pinky.speed=monsterspeed;
-			}
-			else pinky.speed=medamaspeed;
-			break;
-		case TAIKI:
-			if((pinky.x/256)==(MONSTERHOUSEX*8) && (pinky.y/256)==((MONSTERHOUSEY-2)*8)){ //モンスターハウスから出た
-				pinky.status=OIKAKE;
-				pinky.dir=DIR_LEFT;
-			}
-			break;
-		case TAIKI2:
-			pinky.modecount--;
-			if(pinky.modecount==0){
-				pinky.status=TAIKI;
 			}
 	}
 	switch (pinky.status){
@@ -942,12 +989,8 @@ void movepinky(){
 			}
 			break;
 		case MEDAMA:
-			targetx=MONSTERHOUSEX*8*256;
-			targety=MONSTERHOUSEY*8*256;
-			break;
-		case TAIKI:
-			targetx=MONSTERHOUSEX*8*256;
-			targety=(MONSTERHOUSEY-2)*8*256;
+			targetx=(MONSTERHOUSEX*8+4)*256;
+			targety=(MONSTERHOUSEY+1)*8*256;
 	}
 	movemonster(&pinky,targetx,targety);
 }
@@ -958,6 +1001,7 @@ void moveaosuke()
 	unsigned short targetx,targety;
 
 	if(monsterhuntedtimer>0 && aosuke.status!=MEDAMA) return; //誰かが捕獲されているとき目玉以外は停止
+	if(taikicount1) taikicount1--;
 	switch (aosuke.status){
 		case NAWABARI:
 		case OIKAKE:
@@ -970,23 +1014,11 @@ void moveaosuke()
 			}
 			break;
 		case MEDAMA:
-			if((aosuke.x/256)==(MONSTERHOUSEX*8) && (aosuke.y/256)==(MONSTERHOUSEY*8)){ //モンスターハウス到着
-				aosuke.status=TAIKI2;
-				aosuke.modecount=1;
+			if((aosuke.x/256)==(MONSTERHOUSEX*8+4) && (aosuke.y/256)==((MONSTERHOUSEY+1)*8)){ //モンスターハウス到着
+				aosuke.inhouse=1;
+				aosuke.status=OIKAKE;
 				aosuke.dir=DIR_UP;
 				aosuke.speed=monsterspeed;
-			}
-			break;
-		case TAIKI:
-			if((aosuke.x/256)==(MONSTERHOUSEX*8) && (aosuke.y/256)==((MONSTERHOUSEY-2)*8)){ //モンスターハウスから出た
-				aosuke.status=OIKAKE;
-				aosuke.dir=DIR_LEFT;
-			}
-			break;
-		case TAIKI2:
-			aosuke.modecount--;
-			if(aosuke.modecount==0){
-				aosuke.status=TAIKI;
 			}
 	}
 	switch (aosuke.status){
@@ -1009,12 +1041,8 @@ void moveaosuke()
 			targety<<=2;
 			break;
 		case MEDAMA:
-			targetx=MONSTERHOUSEX*8*256;
-			targety=MONSTERHOUSEY*8*256;
-			break;
-		case TAIKI:
-			targetx=MONSTERHOUSEX*8*256;
-			targety=(MONSTERHOUSEY-2)*8*256;
+			targetx=(MONSTERHOUSEX*8+4)*256;
+			targety=(MONSTERHOUSEY+1)*8*256;
 	}
 	movemonster(&aosuke,targetx,targety);
 }
@@ -1026,6 +1054,7 @@ void moveguzuta()
 	short dx,dy;
 
 	if(monsterhuntedtimer>0 && guzuta.status!=MEDAMA) return; //誰かが捕獲されているとき目玉以外は停止
+	if(taikicount2) taikicount2--;
 	switch (guzuta.status){
 		case NAWABARI:
 		case OIKAKE:
@@ -1038,23 +1067,11 @@ void moveguzuta()
 			}
 			break;
 		case MEDAMA:
-			if((guzuta.x/256)==(MONSTERHOUSEX*8) && (guzuta.y/256)==(MONSTERHOUSEY*8)){ //モンスターハウス到着
-				guzuta.status=TAIKI2;
-				guzuta.modecount=1;
+			if((guzuta.x/256)==(MONSTERHOUSEX*8+4) && (guzuta.y/256)==((MONSTERHOUSEY+1)*8)){ //モンスターハウス到着
+				guzuta.inhouse=1;
+				guzuta.status=OIKAKE;
 				guzuta.dir=DIR_UP;
 				guzuta.speed=monsterspeed;
-			}
-			break;
-		case TAIKI:
-			if((guzuta.x/256)==(MONSTERHOUSEX*8) && (guzuta.y/256)==((MONSTERHOUSEY-2)*8)){ //モンスターハウスから出た
-				guzuta.status=OIKAKE;
-				guzuta.dir=DIR_LEFT;
-			}
-			break;
-		case TAIKI2:
-			guzuta.modecount--;
-			if(guzuta.modecount==0){
-				guzuta.status=TAIKI;
 			}
 	}
 	switch (guzuta.status){
@@ -1079,12 +1096,8 @@ void moveguzuta()
 			}
 			break;
 		case MEDAMA:
-			targetx=MONSTERHOUSEX*8*256;
-			targety=MONSTERHOUSEY*8*256;
-			break;
-		case TAIKI:
-			targetx=MONSTERHOUSEX*8*256;
-			targety=(MONSTERHOUSEY-2)*8*256;
+			targetx=(MONSTERHOUSEX*8+4)*256;
+			targety=(MONSTERHOUSEY+1)*8*256;
 	}
 	movemonster(&guzuta,targetx,targety);
 }
@@ -1400,11 +1413,11 @@ void coffeebreak1(void){
 			ac2=4;
 			a2^=1;
 		}
-		putbmpmn(pacx/256,100,XWIDTH_PACMAN,YWIDTH_PACMAN,Pacmanbmp[a1]);
-		putbmpmn(akax/256,101,XWIDTH_MONSTER,YWIDTH_MONSTER,Monsterbmp[6+a2]);
+		putbmpmn(pacx/256,170,XWIDTH_PACMAN,YWIDTH_PACMAN,Pacmanbmp[a1]);
+		putbmpmn(akax/256,171,XWIDTH_MONSTER,YWIDTH_MONSTER,Monsterbmp[6+a2]);
 		playmusic60thsec();
-		clrbmpmn(pacx/256,100,XWIDTH_PACMAN,YWIDTH_PACMAN);
-		clrbmpmn(akax/256,101,XWIDTH_MONSTER,YWIDTH_MONSTER);
+		clrbmpmn(pacx/256,170,XWIDTH_PACMAN,YWIDTH_PACMAN);
+		clrbmpmn(akax/256,171,XWIDTH_MONSTER,YWIDTH_MONSTER);
 		pacx+=pacspeed;
 		akax+=akaspeed;
 	}
@@ -1435,11 +1448,11 @@ void coffeebreak1(void){
 			ac2=4;
 			a2^=1;
 		}
-		putbmpmn(pacx/256,83,31,31,Bigpacbmp[a1]);
-		putbmpmn(akax/256,101,XWIDTH_MONSTER,YWIDTH_MONSTER,Ijikebmp[a2]);
+		putbmpmn(pacx/256,153,31,31,Bigpacbmp[a1]);
+		putbmpmn(akax/256,171,XWIDTH_MONSTER,YWIDTH_MONSTER,Ijikebmp[a2]);
 		playmusic60thsec();
-		clrbmpmn(pacx/256,83,31,31);
-		clrbmpmn(akax/256,101,XWIDTH_MONSTER,YWIDTH_MONSTER);
+		clrbmpmn(pacx/256,153,31,31);
+		clrbmpmn(akax/256,171,XWIDTH_MONSTER,YWIDTH_MONSTER);
 		pacx+=pacspeed;
 		akax+=akaspeed;
 	}
@@ -1477,12 +1490,12 @@ void coffeebreak2(void){
 			ac2=4;
 			a2^=1;
 		}
-		putbmpmn(122,111,1,4,Pinbmp);
-		putbmpmn(pacx/256,100,XWIDTH_PACMAN,YWIDTH_PACMAN,Pacmanbmp[a1]);
-		putbmpmn(akax/256,101,XWIDTH_MONSTER,YWIDTH_MONSTER,Monsterbmp[6+a2]);
+		putbmpmn(122,181,1,4,Pinbmp);
+		putbmpmn(pacx/256,170,XWIDTH_PACMAN,YWIDTH_PACMAN,Pacmanbmp[a1]);
+		putbmpmn(akax/256,171,XWIDTH_MONSTER,YWIDTH_MONSTER,Monsterbmp[6+a2]);
 		playmusic60thsec();
-		clrbmpmn(pacx/256,100,XWIDTH_PACMAN,YWIDTH_PACMAN);
-		clrbmpmn(akax/256,101,XWIDTH_MONSTER,YWIDTH_MONSTER);
+		clrbmpmn(pacx/256,170,XWIDTH_PACMAN,YWIDTH_PACMAN);
+		clrbmpmn(akax/256,171,XWIDTH_MONSTER,YWIDTH_MONSTER);
 		pacx+=pacspeed;
 		akax+=akaspeed;
 	}
@@ -1502,20 +1515,20 @@ void coffeebreak2(void){
 			ac2=4;
 			a2^=1;
 		}
-		putbmpmn(pacx/256,100,XWIDTH_PACMAN,YWIDTH_PACMAN,Pacmanbmp[a1]);
-		putbmpmn(akax/256,101,XWIDTH_MONSTER,YWIDTH_MONSTER,Monsterbmp[6+a2]);
+		putbmpmn(pacx/256,170,XWIDTH_PACMAN,YWIDTH_PACMAN,Pacmanbmp[a1]);
+		putbmpmn(akax/256,171,XWIDTH_MONSTER,YWIDTH_MONSTER,Monsterbmp[6+a2]);
 		playmusic60thsec();
-		clrbmpmn(pacx/256,100,XWIDTH_PACMAN,YWIDTH_PACMAN);
-		clrbmpmn(akax/256,101,XWIDTH_MONSTER-1,YWIDTH_MONSTER);
-		clrbmpmn(akax/256+XWIDTH_MONSTER-1,101,1,YWIDTH_MONSTER-4);
+		clrbmpmn(pacx/256,170,XWIDTH_PACMAN,YWIDTH_PACMAN);
+		clrbmpmn(akax/256,171,XWIDTH_MONSTER-1,YWIDTH_MONSTER);
+		clrbmpmn(akax/256+XWIDTH_MONSTER-1,171,1,YWIDTH_MONSTER-4);
 		pacx+=pacspeed;
 		akax+=akaspeed;
 	}
-	putbmpmn(akax/256,101,22,13,Yabukebmp[0]);
+	putbmpmn(akax/256,171,22,13,Yabukebmp[0]);
 	for(i=0;i<20;i++){
 		playmusic60thsec();
 	}
-	putbmpmn(akax/256,101,22,13,Yabukebmp[1]);
+	putbmpmn(akax/256,171,22,13,Yabukebmp[1]);
 	for(i=0;i<60;i++){
 		playmusic60thsec();
 	}
@@ -1550,11 +1563,11 @@ void coffeebreak3(void){
 			ac2=4;
 			a2^=1;
 		}
-		putbmpmn(pacx/256,100,XWIDTH_PACMAN,YWIDTH_PACMAN,Pacmanbmp[a1]);
-		putbmpmn(akax/256,101,XWIDTH_MONSTER,YWIDTH_MONSTER,Yabuke2bmp[a2]);
+		putbmpmn(pacx/256,170,XWIDTH_PACMAN,YWIDTH_PACMAN,Pacmanbmp[a1]);
+		putbmpmn(akax/256,171,XWIDTH_MONSTER,YWIDTH_MONSTER,Yabuke2bmp[a2]);
 		playmusic60thsec();
-		clrbmpmn(pacx/256,100,XWIDTH_PACMAN,YWIDTH_PACMAN);
-		clrbmpmn(akax/256,101,XWIDTH_MONSTER,YWIDTH_MONSTER);
+		clrbmpmn(pacx/256,170,XWIDTH_PACMAN,YWIDTH_PACMAN);
+		clrbmpmn(akax/256,171,XWIDTH_MONSTER,YWIDTH_MONSTER);
 		pacx+=pacspeed;
 		akax+=akaspeed;
 	}
@@ -1573,9 +1586,9 @@ void coffeebreak3(void){
 			ac2=4;
 			a2^=1;
 		}
-		putbmpmn(akax/256,101,22,13,Hadakabmp[a2]);
+		putbmpmn(akax/256,171,22,13,Hadakabmp[a2]);
 		playmusic60thsec();
-		clrbmpmn(akax/256,101,22,13);
+		clrbmpmn(akax/256,171,22,13);
 		akax+=akaspeed;
 	}
 	for(i=0;i<30;i++){
@@ -1584,7 +1597,7 @@ void coffeebreak3(void){
 }
 void gamestart(void){
 	unsigned int i;
-	printstrc(8,15,6,"READY!");
+	printstrc(12,22,6,"READY!");
 	if(gamestatus==0){ //ゲーム開始時
 		startmusic(musicdata1);//ゲームスタートの音楽開始
 		for(i=0;i<120;i++){ //まず2秒間演奏
@@ -1603,7 +1616,7 @@ void gamestart(void){
 		displayplayers();
 		wait60thsec(120); //2秒ウェイト
 	}
-	printstrc(8,15,0,"      "); //READY消去
+	printstrc(12,22,0,"      "); //READY消去
 }
 void deadanim(void){
 	//パックマンがやられたときのアニメーション＆サウンド
@@ -1647,7 +1660,7 @@ void putwall(void){
 	for(i=0;i<MAPYSIZE;i++){
 		for(j=0;j<MAPXSIZE;j++){
 			if(*p<=0x8d){
-				printchar(j,i,COLOR_WALL,*p);
+				printchar(j+MAPXOFS,i+MAPYOFS,COLOR_WALL,*p);
 			}
 			p++;
 		}
@@ -1693,7 +1706,7 @@ void stageclear(void){
 
 void gameover(){
 	//ゲームオーバー時
-	printstrc(6,10,2,"GAME OVER");
+	printstrc(10,22,2,"GAME  OVER");
 	wait60thsec(180); // 3秒ウェイト
 }
 
@@ -1707,56 +1720,56 @@ void title(void){
 	while(1){
 		clearscreen();
 
-		printstrc(5,2,2,"1UP");
-		printstrc(18,2,2,"HI-SCORE");
-		printscore(4,3,7,score);
-		printchar(10,3,7,'0');
-		printscore(19,3,7,highscore);
-		printchar(25,3,7,'0');
+		printstrc(4,2,7,"1UP");
+		printstrc(10,2,7,"HIGH SCORE");
+		printscore(1,3,7,score);
+		printchar(7,3,7,'0');
+		printscore(11,3,7,highscore);
+		printchar(17,3,7,'0');
 
 		//ロゴ表示
-		putbmpmn(63,80,114,36,Titlelogobmp[0]);
+		putbmpmn(63,100,114,36,Titlelogobmp[0]);
 
-		printstrc( 4,20,7,"FOR RP2350-TOUCH-LCD-2");
-		printstrc(10,22,7,"BY KENKEN");
-		printstrc( 6,25,4,"PUSH START BUTTON");
+		printstrc( 4,26,7,"FOR MACHIKANIA TYPE P");
+		printstrc(10,28,7,"BY KENKEN");
+		printstrc( 6,31,4,"PUSH START BUTTON");
 
 		if(startkeycheck(600)) return;//10秒ウェイト
 
 		clearscreen();
-		printstrc(5,2,2,"1UP");
-		printstrc(18,2,2,"HI-SCORE");
-		printscore(4,3,7,score);
-		printchar(10,3,7,'0');
-		printscore(19,3,7,highscore);
-		printchar(25,3,7,'0');
-		printstrc(4,6,7,"CHARACTER  /  NICKNAME");
+		printstrc(4,2,7,"1UP");
+		printstrc(10,2,7,"HIGH SCORE");
+		printscore(1,3,7,score);
+		printchar(7,3,7,'0');
+		printscore(11,3,7,highscore);
+		printchar(17,3,7,'0');
+		printstrc(8,7,7,"CHARACTER / NICKNAME");
 		if(startkeycheck(50)) return;
-		putbmpmn(3*8-3,8*8-3,XWIDTH_MONSTER,YWIDTH_MONSTER,Monsterbmp[AKABEI*8+2]);
-		printstrc(5,8,COLOR_AKABEI,"OIKAKE\x90\x90\x90\x90\x90\x90\x90");
+		putbmpmn(40,9*8-3,XWIDTH_MONSTER,YWIDTH_MONSTER,Monsterbmp[AKABEI*8+2]);
+		printstrc(9,9,COLOR_AKABEI,"OIKAKE\x90\x90\x90\x90");
 		if(startkeycheck(50)) return;
-		printstrc(18,8,COLOR_AKABEI,"\"AKABEI\"");
+		printstrc(19,9,COLOR_AKABEI,"\"AKABEI\"");
 		if(startkeycheck(50)) return;
-		putbmpmn(3*8-3,10*8-3,XWIDTH_MONSTER,YWIDTH_MONSTER,Monsterbmp[PINKY*8+2]);
-		printstrc(5,10,COLOR_PINKY,"MACHIBUSE\x90\x90\x90\x90");
+		putbmpmn(40,12*8-3,XWIDTH_MONSTER,YWIDTH_MONSTER,Monsterbmp[PINKY*8+2]);
+		printstrc(9,12,COLOR_PINKY,"MACHIBUSE\x90\x90");
 		if(startkeycheck(50)) return;
-		printstrc(18,10,COLOR_PINKY,"\"PINKY\"");
+		printstrc(20,12,COLOR_PINKY,"\"PINKY\"");
 		if(startkeycheck(50)) return;
-		putbmpmn(3*8-3,12*8-3,XWIDTH_MONSTER,YWIDTH_MONSTER,Monsterbmp[AOSUKE*8+2]);
-		printstrc(5,12,COLOR_AOSUKE,"KIMAGURE\x90\x90\x90\x90\x90");
+		putbmpmn(40,15*8-3,XWIDTH_MONSTER,YWIDTH_MONSTER,Monsterbmp[AOSUKE*8+2]);
+		printstrc(9,15,COLOR_AOSUKE,"KIMAGURE\x90\x90");
 		if(startkeycheck(50)) return;
-		printstrc(18,12,COLOR_AOSUKE,"\"AOSUKE\"");
+		printstrc(19,15,COLOR_AOSUKE,"\"AOSUKE\"");
 		if(startkeycheck(50)) return;
-		putbmpmn(3*8-3,14*8-3,XWIDTH_MONSTER,YWIDTH_MONSTER,Monsterbmp[GUZUTA*8+2]);
-		printstrc(5,14,COLOR_GUZUTA,"OTOBOKE\x90\x90\x90\x90\x90\x90");
+		putbmpmn(40,18*8-3,XWIDTH_MONSTER,YWIDTH_MONSTER,Monsterbmp[GUZUTA*8+2]);
+		printstrc(9,18,COLOR_GUZUTA,"OTOBOKE\x90\x90\x90");
 		if(startkeycheck(50)) return;
-		printstrc(18,14,COLOR_GUZUTA,"\"GUZUTA\"");
+		printstrc(19,18,COLOR_GUZUTA,"\"GUZUTA\"");
 		if(startkeycheck(50)) return;
-		printchar(11,21,COLOR_COOKIE,CODE_COOKIE);
-		printstrc(13,21,7,"10 PTS");
-		printchar(11,22,COLOR_COOKIE,CODE_POWERCOOKIE);
-		printstrc(13,22,7,"50 PTS");
-		printstrc(6,25,4,"PUSH START BUTTON");
+		printchar(11,26,COLOR_COOKIE,CODE_COOKIE);
+		printstrc(13,26,7,"10 PTS");
+		printchar(11,28,COLOR_COOKIE,CODE_POWERCOOKIE);
+		printstrc(13,28,7,"50 PTS");
+		printstrc(6,31,4,"PUSH START BUTTON");
 
 		gamecount=0;
 		pacx=239*256;
@@ -1782,15 +1795,15 @@ void title(void){
 				ac2=4;
 				a2^=1;
 			}
-			printchar(6,17,COLOR_POWERCOOKIE,CODE_POWERCOOKIE);
-			putbmpmn(pacx/256,133,XWIDTH_PACMAN,YWIDTH_PACMAN,Pacmanbmp[a1]);
-			putbmpmn(akax/256,134,XWIDTH_MONSTER,YWIDTH_MONSTER,Monsterbmp[AKABEI*8+6+a2]);
-			putbmpmn(akax/256+18,134,XWIDTH_MONSTER,YWIDTH_MONSTER,Monsterbmp[PINKY*8+6+a2]);
-			putbmpmn(akax/256+36,134,XWIDTH_MONSTER,YWIDTH_MONSTER,Monsterbmp[AOSUKE*8+6+a2]);
-			putbmpmn(akax/256+54,134,XWIDTH_MONSTER,YWIDTH_MONSTER,Monsterbmp[GUZUTA*8+6+a2]);
+			printchar(6,22,COLOR_POWERCOOKIE,CODE_POWERCOOKIE);
+			putbmpmn(pacx/256,173,XWIDTH_PACMAN,YWIDTH_PACMAN,Pacmanbmp[a1]);
+			putbmpmn(akax/256,174,XWIDTH_MONSTER,YWIDTH_MONSTER,Monsterbmp[AKABEI*8+6+a2]);
+			putbmpmn(akax/256+18,174,XWIDTH_MONSTER,YWIDTH_MONSTER,Monsterbmp[PINKY*8+6+a2]);
+			putbmpmn(akax/256+36,174,XWIDTH_MONSTER,YWIDTH_MONSTER,Monsterbmp[AOSUKE*8+6+a2]);
+			putbmpmn(akax/256+54,174,XWIDTH_MONSTER,YWIDTH_MONSTER,Monsterbmp[GUZUTA*8+6+a2]);
 			if(startkeycheck(1)) return;
-			clrbmpmn(pacx/256,133,XWIDTH_PACMAN,YWIDTH_PACMAN);
-			clrbmpmn(akax/256,134,XWIDTH_MONSTER+54,YWIDTH_MONSTER);
+			clrbmpmn(pacx/256,173,XWIDTH_PACMAN,YWIDTH_PACMAN);
+			clrbmpmn(akax/256,174,XWIDTH_MONSTER+54,YWIDTH_MONSTER);
 			pacx+=pacspeed;
 			akax+=akaspeed;
 			gamecount++;
@@ -1814,51 +1827,62 @@ void title(void){
 				ac2=4;
 				a2^=1;
 			}
-			if(i<=0) putbmpmn(akax/256,134,XWIDTH_MONSTER,YWIDTH_MONSTER,Ijikebmp[a2]);
-			if(i<=1) putbmpmn(akax/256+18,134,XWIDTH_MONSTER,YWIDTH_MONSTER,Ijikebmp[a2]);
-			if(i<=2) putbmpmn(akax/256+36,134,XWIDTH_MONSTER,YWIDTH_MONSTER,Ijikebmp[a2]);
-			if(i<=3) putbmpmn(akax/256+54,134,XWIDTH_MONSTER,YWIDTH_MONSTER,Ijikebmp[a2]);
-			putbmpmn(pacx/256,133,XWIDTH_PACMAN,YWIDTH_PACMAN,Pacmanbmp[a1]);
+			if(i<=0) putbmpmn(akax/256,174,XWIDTH_MONSTER,YWIDTH_MONSTER,Ijikebmp[a2]);
+			if(i<=1) putbmpmn(akax/256+18,174,XWIDTH_MONSTER,YWIDTH_MONSTER,Ijikebmp[a2]);
+			if(i<=2) putbmpmn(akax/256+36,174,XWIDTH_MONSTER,YWIDTH_MONSTER,Ijikebmp[a2]);
+			if(i<=3) putbmpmn(akax/256+54,174,XWIDTH_MONSTER,YWIDTH_MONSTER,Ijikebmp[a2]);
+			putbmpmn(pacx/256,173,XWIDTH_PACMAN,YWIDTH_PACMAN,Pacmanbmp[a1]);
 			if(startkeycheck(1)) return;
-			clrbmpmn(pacx/256,133,XWIDTH_PACMAN,YWIDTH_PACMAN);
+			clrbmpmn(pacx/256,173,XWIDTH_PACMAN,YWIDTH_PACMAN);
 			switch(i){
 				case 0:
 					if(pacx/256>akax/256-6){
 						i++;
-						clrbmpmn(akax/256,134,XWIDTH_MONSTER,YWIDTH_MONSTER);
-						putbmpmn(pacx/256,136,XWIDTH_SCORE,YWIDTH_SCORE,Scorebmp[0]);
+						clrbmpmn(akax/256,174,XWIDTH_MONSTER,YWIDTH_MONSTER);
+						putbmpmn(pacx/256,176,XWIDTH_SCORE,YWIDTH_SCORE,Scorebmp[0]);
 						if(startkeycheck(30)) return;
 					}
 					break;
 				case 1:
 					if(pacx/256>akax/256+18-6){
 						i++;
-						clrbmpmn(akax/256+18,134,XWIDTH_MONSTER,YWIDTH_MONSTER);
-						putbmpmn(pacx/256,136,XWIDTH_SCORE,YWIDTH_SCORE,Scorebmp[1]);
+						clrbmpmn(akax/256+18,174,XWIDTH_MONSTER,YWIDTH_MONSTER);
+						putbmpmn(pacx/256,176,XWIDTH_SCORE,YWIDTH_SCORE,Scorebmp[1]);
 						if(startkeycheck(30)) return;
 					}
 					break;
 				case 2:
 					if(pacx/256>akax/256+36-6){
 						i++;
-						clrbmpmn(akax/256+36,134,XWIDTH_MONSTER,YWIDTH_MONSTER);
-						putbmpmn(pacx/256,136,XWIDTH_SCORE,YWIDTH_SCORE,Scorebmp[2]);
+						clrbmpmn(akax/256+36,174,XWIDTH_MONSTER,YWIDTH_MONSTER);
+						putbmpmn(pacx/256,176,XWIDTH_SCORE,YWIDTH_SCORE,Scorebmp[2]);
 						if(startkeycheck(30)) return;
 					}
 					break;
 				case 3:
 					if(pacx/256>akax/256+54-6){
 						i++;
-						clrbmpmn(akax/256+54,134,XWIDTH_MONSTER,YWIDTH_MONSTER);
-						putbmpmn(pacx/256,136,XWIDTH_SCORE,YWIDTH_SCORE,Scorebmp[3]);
+						clrbmpmn(akax/256+54,174,XWIDTH_MONSTER,YWIDTH_MONSTER);
+						putbmpmn(pacx/256,176,XWIDTH_SCORE,YWIDTH_SCORE,Scorebmp[3]);
 						if(startkeycheck(30)) return;
 					}
 			}
-			clrbmpmn(akax/256,134,XWIDTH_MONSTER+54,YWIDTH_MONSTER);
+			clrbmpmn(akax/256,174,XWIDTH_MONSTER+54,YWIDTH_MONSTER);
 			pacx+=pacspeed;
 			akax+=akaspeed;
 		}
 	}
+}
+void firekeycheck(){
+	unsigned int k;
+	if(!(~gpio_get_all() & KEYFIRE)) return;
+	sound_off();
+	do wait60thsec(1);
+	while(~gpio_get_all() & KEYFIRE);
+	do wait60thsec(1);
+	while(!(~gpio_get_all() & KEYFIRE));
+	do wait60thsec(1);
+	while(~gpio_get_all() & KEYFIRE);
 }
 void game(void){
 	gameinit2();//スコアなど初期化
@@ -1882,6 +1906,7 @@ void game(void){
 				fruitcheck();	//フルーツ関係チェック
 				huntedcheck();	//食った、食われたチェック
 				displayscore();	//スコア表示
+//				firekeycheck();
 			}
 			sound_off();//サウンド停止
 			set_palette(COLOR_POWERCOOKIE,0,255,255);//パワーえさの色標準に戻す
@@ -1926,8 +1951,10 @@ void core1_entry(void){
 }
 
 void main() {
-    stdio_init_all();
+	vreg_set_voltage(15); // Set core 1.30V
+	set_sys_clock_hz(200000000,false); // Set clock speed 200MHz
 
+	stdio_init_all();
 	// ボタン用GPIO設定
 	gpio_init_mask(KEYSMASK);
 	gpio_init_mask(GPIO_ALL_MASK);
@@ -1953,9 +1980,6 @@ void main() {
 
 	// LCD初期化
 	lcd_display_init();
-	LCD_WriteComm(0x37); //画面中央にするためスクロール設定
-	if(lcd180turn) LCD_WriteData2(320-272);
-	else LCD_WriteData2(272);
 
 	// IMU初期化
 	if(init_imu()) imu_on=0; // IMU not found

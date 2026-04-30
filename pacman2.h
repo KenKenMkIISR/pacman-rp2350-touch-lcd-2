@@ -15,8 +15,6 @@ PURPOSE. The copyright owner and contributors are NOT LIABLE for any damages
 caused by using this program.
 
 ----------------------------------------------------------------------------*/
-//グラフィック版パックマン用ヘッダーファイル for pic32mx150f/250f
-
 //　方向の値
 #define DIR_UP 0
 #define DIR_RIGHT 1
@@ -24,42 +22,44 @@ caused by using this program.
 #define DIR_LEFT 3
 
 //各種値の定義
-#define MAPXSIZE 21 //通路の横サイズ
-#define MAPYSIZE 27 //通路の縦サイズ
+#define MAPXOFS 1 //通路の左上キャラクタ座標X
+#define MAPYOFS 5 //通路の左上キャラクタ座標Y
+#define MAPXSIZE 28 //通路の横サイズ
+#define MAPYSIZE 31 //通路の縦サイズ
 #define STAGEMAX 21 //データ定義されたステージ数の最大、以降は同一内容の繰り返し
-#define FRUITTIME1 130 //各ステージの1つ目フルーツ出現時の残りえさ数
-#define FRUITTIME2 55 //各ステージの2つ目フルーツ出現時の残りえさ数
-#define FRUITX 10 //フルーツ表示位置X
-#define FRUITY 15 //フルーツ表示位置Y
-#define MONSTERHOUSEX 10 //モンスターハウスX座標
-#define MONSTERHOUSEY 12 //モンスターハウスY座標
-#define NAWABARIAKABEIX 15 //アカベイの縄張り目標X
+#define FRUITTIME1 150 //各ステージの1つ目フルーツ出現時の残りえさ数
+#define FRUITTIME2 70 //各ステージの2つ目フルーツ出現時の残りえさ数
+#define FRUITX 13 //フルーツ表示位置X
+#define FRUITY 17 //フルーツ表示位置Y
+#define MONSTERHOUSEX 13 //モンスターハウスX座標
+#define MONSTERHOUSEY 13 //モンスターハウスY座標
+#define NAWABARIAKABEIX 21 //アカベイの縄張り目標X
 #define NAWABARIAKABEIY 3 //アカベイの縄張り目標Y
 #define NAWABARIPINKYX 1 //ピンキーの縄張り目標X
 #define NAWABARIPINKYY 3 //ピンキーの縄張り目標Y
-#define NAWABARIAOSUKEX 17 //アオスケの縄張り目標X
-#define NAWABARIAOSUKEY 18 //アオスケの縄張り目標Y
+#define NAWABARIAOSUKEX 24 //アオスケの縄張り目標X
+#define NAWABARIAOSUKEY 20 //アオスケの縄張り目標Y
 #define NAWABARIGUZUTAX 3 //グズタの縄張り目標X
-#define NAWABARIGUZUTAY 21 //グズタの縄張り目標Y
-#define ONEWAY1X 9 //一方通行1のX座標
-#define ONEWAY1Y 9 //一方通行1のY座標
-#define ONEWAY2X 11 //一方通行2のX座標
-#define ONEWAY2Y 9 //一方通行2のY座標
-#define ONEWAY3X 9 //一方通行3のX座標
-#define ONEWAY3Y 19 //一方通行3のY座標
-#define ONEWAY4X 11 //一方通行4のX座標
-#define ONEWAY4Y 19 //一方通行4のY座標
-#define WARPX1 4 //ワープゾーンのX座標1
-#define WARPX2 16 //ワープゾーンのX座標2
-#define WARPY 13 //ワープゾーンのY座標
+#define NAWABARIGUZUTAY 26 //グズタの縄張り目標Y
+#define ONEWAY1X 12 //一方通行1のX座標
+#define ONEWAY1Y 10 //一方通行1のY座標
+#define ONEWAY2X 15 //一方通行2のX座標
+#define ONEWAY2Y 10 //一方通行2のY座標
+#define ONEWAY3X 12 //一方通行3のX座標
+#define ONEWAY3Y 22 //一方通行3のY座標
+#define ONEWAY4X 15 //一方通行4のX座標
+#define ONEWAY4Y 22 //一方通行4のY座標
+#define WARPX1 5 //ワープゾーンのX座標1
+#define WARPX2 22 //ワープゾーンのX座標2
+#define WARPY 14 //ワープゾーンのY座標
 #define POWERCOOKIEX1 1
 #define POWERCOOKIEY1 3
-#define POWERCOOKIEX2 19
+#define POWERCOOKIEX2 26
 #define POWERCOOKIEY2 3
 #define POWERCOOKIEX3 1
-#define POWERCOOKIEY3 20
-#define POWERCOOKIEX4 19
-#define POWERCOOKIEY4 20
+#define POWERCOOKIEY3 23
+#define POWERCOOKIEX4 26
+#define POWERCOOKIEY4 23
 
 #define XWIDTH_PACMAN 14
 #define YWIDTH_PACMAN 14
@@ -69,7 +69,7 @@ caused by using this program.
 #define YWIDTH_SCORE 7
 
 //各種キャラクターコード定義
-#define CODE_WALL1 0x80
+#define CODE_WALL1 0x74
 #define CODE_WALL2 0x8d
 #define CODE_COOKIE 0x90
 #define CODE_POWERCOOKIE 0x91
@@ -100,7 +100,7 @@ caused by using this program.
 #define TIMER_OIKAKE 1200 //追いかけモード時間
 #define TIMER_NAWABARI 600 //縄張りモード時間
 #define TIMER_FRUIT 600 //フルーツ表示時間
-#define TIMER_HUNTEDSTOP 60 //イジケを食・ｽときの停止時間
+#define TIMER_HUNTEDSTOP 60 //イジケを食べたときの停止時間
 #define TIMER_FRUITSCORE 120 //フルーツのスコア表示時間
 
 // モンスターのモード（status）
@@ -108,8 +108,6 @@ caused by using this program.
 #define OIKAKE 2
 #define IJIKE 3
 #define MEDAMA 4
-#define TAIKI 5
-#define TAIKI2 6
 
 // モンスター番号
 #define AKABEI 0
@@ -132,6 +130,7 @@ typedef struct {
 	unsigned char animvalue; // アニメーション値
 	unsigned char animcount; // アニメーションカウンター、減らしていき0になったらアニメーション値を更新
 	unsigned char animcount0; // アニメーションカウンター初期値
+	unsigned char inhouse; // モンスターハウスの中にいるフラグ
 	unsigned short modecount; // 現在のモードのカウンター
 } _Character;
 
@@ -156,6 +155,3 @@ extern const unsigned char Yabukebmp[][22*13]; //破けモンスタービット�
 extern const unsigned char Yabuke2bmp[][14*13]; //破けモンスター2ビットマップ
 extern const unsigned char Hadakabmp[][22*13]; //裸モンスタービットマップ
 extern const unsigned char Titlelogobmp[][114]; //タイトルロゴビットマップ
-
-
-

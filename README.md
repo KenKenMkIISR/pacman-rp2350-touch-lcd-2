@@ -1,7 +1,7 @@
 # PACMAN for RP2350-Touch-LCD-2
 ![](./image/pic2.jpg)
 ![](./image/pic1.jpg)  
-Waveshare製RP2350-Touch-LCD-2で遊べるパックマンです。
+Waveshare製RP2350-Touch-LCD-2で遊べるパックマンです。アーケード版に更新しました。
 
 ## 実行方法
 RP2350-Touch-LCD-2のBOOTボタンを押しながらUSBケーブルでPCに接続し、uf2ディレクトリのpacman-rp2350-touch-lcd-2.uf2をRP2350-Touch-LCD-2にコピーしてください。  
