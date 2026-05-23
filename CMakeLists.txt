@@ -29,4 +29,7 @@ target_include_directories(pacman-rp2350-touch-lcd-2 PUBLIC
 # Pull in basic dependencies
 target_link_libraries(pacman-rp2350-touch-lcd-2 pico_stdlib hardware_spi hardware_pwm tinyusb_host tinyusb_board pico_multicore hardware_i2c)
 
+# set compile definitions
+add_compile_definitions(PICO_CLOCK_ADJUST_PERI_CLOCK_WITH_SYS_CLOCK=1)
+
 pico_add_extra_outputs(pacman-rp2350-touch-lcd-2)
